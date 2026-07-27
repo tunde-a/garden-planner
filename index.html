@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#16a34a">
+  <title>Garden Planner</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="header">
+    <h1 id="headerTitle">Tasks</h1>
+  </div>
+
+  <!-- Calendar Page -->
+  <div id="page-calendar" class="page active">
+    <div class="year-nav">
+      <button onclick="changeYear(-1)">‹</button>
+      <span id="yearLabel"></span>
+      <button onclick="changeYear(1)">›</button>
+    </div>
+    <div class="month-strip" id="monthStrip"></div>
+    <div id="calendarTasks"></div>
+  </div>
+
+  <!-- Search/Add Page -->
+  <div id="page-search" class="page">
+    <input type="search" class="search-input" id="searchInput" placeholder="Search plants (e.g. Dahlia)..." oninput="onSearch(this.value)">
+    <button class="btn btn-outline" style="width:100%;margin-bottom:12px;" onclick="showAddManualModal()">+ Add plant manually</button>
+    <div id="searchResults"></div>
+  </div>
+
+  <!-- My Garden Page -->
+  <div id="page-garden" class="page">
+    <div id="gardenList"></div>
+  </div>
+
+  <!-- Plant Detail Page (replaces garden) -->
+  <div id="page-detail" class="page">
+    <button class="back-btn" onclick="showPage('garden')">← Back to Garden</button>
+    <h2 id="detailTitle" style="font-size:18px;margin-bottom:12px;"></h2>
+    <div id="detailTasks"></div>
+  </div>
+
+  <!-- Reminders Page -->
+  <div id="page-reminders" class="page">
+    <div id="remindersList"></div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tabs">
+    <button class="tab active" onclick="showPage('calendar')" id="tab-calendar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Calendar
+    </button>
+    <button class="tab" onclick="showPage('search')" id="tab-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Add Plant
+    </button>
+    <button class="tab" onclick="showPage('garden')" id="tab-garden">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 20V10a6 6 0 0112 0v10"/><path d="M12 4v2"/><path d="M4.93 7.93l1.41 1.41"/><path d="M19.07 7.93l-1.41 1.41"/></svg>
+      My Garden
+    </button>
+    <button class="tab" onclick="showPage('reminders')" id="tab-reminders">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+      Reminders
+    </button>
+  </div>
+
+  <!-- FAB for adding recurring tasks (only on reminders page) -->
+  <button class="fab" id="fab" style="display:none;" onclick="showAddRecurringModal()">+</button>
+
+  <!-- Modal container -->
+  <div id="modalContainer"></div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

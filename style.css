@@ -1,0 +1,424 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --green: #16a34a;
+  --green-light: #f0fdf4;
+  --orange: #ea580c;
+  --blue: #2563eb;
+  --red: #dc2626;
+  --pink: #ec4899;
+  --brown: #92400e;
+  --teal: #0d9488;
+  --purple: #7c3aed;
+  --gray: #6b7280;
+  --gray-light: #f3f4f6;
+  --radius: 10px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--green-light);
+  color: #1f2937;
+  min-height: 100vh;
+  padding-bottom: 70px;
+}
+
+.header {
+  background: var(--green);
+  color: white;
+  padding: 16px 20px 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header h1 { font-size: 18px; font-weight: 700; }
+
+.tabs {
+  display: flex;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  font-size: 10px;
+  color: var(--gray);
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.tab.active { color: var(--green); }
+.tab svg { width: 24px; height: 24px; margin-bottom: 2px; }
+
+.page { display: none; padding: 12px; }
+.page.active { display: block; }
+
+/* Month picker */
+.month-strip {
+  display: flex;
+  overflow-x: auto;
+  gap: 6px;
+  padding: 8px 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.month-strip::-webkit-scrollbar { display: none; }
+
+.month-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: var(--gray-light);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.month-btn.active {
+  background: var(--green);
+  color: white;
+}
+
+.month-btn .dot {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin: 3px auto 0;
+  background: var(--green);
+}
+
+.month-btn.active .dot { background: white; }
+
+/* Year nav */
+.year-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px;
+}
+
+.year-nav button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 12px;
+}
+
+.year-nav span { font-size: 18px; font-weight: 700; }
+
+/* Cards */
+.card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.task-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.task-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.task-info { flex: 1; min-width: 0; }
+.task-name { font-weight: 600; font-size: 15px; }
+.task-meta { font-size: 12px; color: var(--gray); margin-top: 2px; }
+.task-notes { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+
+.task-check {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  background: none;
+}
+
+.task-check.done {
+  background: var(--green);
+  border-color: var(--green);
+  color: white;
+}
+
+/* Subtasks */
+.subtasks {
+  margin-top: 8px;
+  padding-left: 38px;
+  border-top: 1px solid var(--gray-light);
+  padding-top: 8px;
+}
+
+.subtask-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.subtask-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: 2px solid #d1d5db;
+  cursor: pointer;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.subtask-check.done {
+  background: var(--green);
+  border-color: var(--green);
+  color: white;
+  font-size: 10px;
+}
+
+.subtask-text { font-size: 13px; }
+.subtask-text.done { text-decoration: line-through; color: var(--gray); }
+
+.subtask-add {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.subtask-add input {
+  flex: 1;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.subtask-add button {
+  background: var(--green);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Search */
+.search-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: var(--radius);
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+
+.search-result {
+  padding: 12px 14px;
+  background: white;
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.search-result:active { background: var(--gray-light); }
+.search-result .name { font-weight: 600; font-size: 14px; }
+.search-result .variety { font-size: 12px; color: var(--gray); }
+.search-result .badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #dcfce7;
+  color: var(--green);
+}
+
+.online-badge {
+  background: #dbeafe !important;
+  color: var(--blue) !important;
+}
+
+/* Section headers */
+.section-header {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--gray);
+  padding: 12px 4px 6px;
+}
+
+/* Garden plant list */
+.plant-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.plant-card:active { background: var(--gray-light); }
+.plant-card .plant-icon { font-size: 20px; }
+.plant-card .plant-info { flex: 1; }
+.plant-card .plant-name { font-weight: 600; font-size: 15px; }
+.plant-card .plant-progress { font-size: 12px; color: var(--gray); }
+
+/* Detail page */
+.back-btn {
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: var(--green);
+  cursor: pointer;
+  padding: 4px 0;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+/* Recurring tasks */
+.recurring-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.recurring-info { flex: 1; }
+.recurring-title { font-weight: 600; font-size: 14px; }
+.recurring-meta { font-size: 12px; color: var(--gray); }
+.recurring-due { font-size: 11px; color: var(--red); font-weight: 600; }
+
+/* Buttons */
+.btn {
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-green { background: var(--green); color: white; }
+.btn-outline { background: white; border: 1px solid #d1d5db; color: #374151; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.modal {
+  background: white;
+  border-radius: 16px 16px 0 0;
+  padding: 20px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal h3 { margin-bottom: 16px; font-size: 18px; }
+
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--gray); margin-bottom: 4px; }
+.form-group input, .form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.modal-actions .btn { flex: 1; }
+
+/* Completed section */
+.completed-toggle {
+  font-size: 13px;
+  color: var(--gray);
+  cursor: pointer;
+  padding: 8px 0;
+  font-weight: 600;
+}
+
+.task-delete {
+  background: none;
+  border: none;
+  color: var(--red);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.5;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--gray);
+}
+
+.empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+.empty-state p { font-size: 14px; }
+
+.fab {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--green);
+  color: white;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 50;
+}
