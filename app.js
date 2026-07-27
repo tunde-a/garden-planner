@@ -364,35 +364,142 @@ window.onSearch = async function(query) {
   const plants = await getAll('plants');
   const local = plants.filter(p =>
     p.name.toLowerCase().includes(lower) || (p.variety || '').toLowerCase().includes(lower)
-  ).slice(0, 20);
+  );
 
-  const online = PLANT_SLUGS.filter(s => s.name.toLowerCase().includes(lower)).slice(0, 15);
+  // Group local results by genus
+  const genusList = {};
+  for (const p of local) {
+    if (!genusList[p.name]) genusList[p.name] = [];
+    genusList[p.name].push(p);
+  }
+
+  // Online results grouped by genus
+  const online = PLANT_SLUGS.filter(s => s.name.toLowerCase().includes(lower)).slice(0, 30);
+  const onlineGenus = {};
+  for (const o of online) {
+    const parts = o.name.split(' ');
+    const genus = parts[0];
+    if (!onlineGenus[genus]) onlineGenus[genus] = [];
+    onlineGenus[genus].push(o);
+  }
+
+  // Community plants
+  let communityPlants = [];
+  try {
+    const resp = await fetch(PUSH_SERVER + '/plants?q=' + encodeURIComponent(query));
+    if (resp.ok) communityPlants = await resp.json();
+  } catch(e) {}
 
   let html = '';
-  if (online.length > 0) {
-    html += '<div class="section-header">Online (Gardeners\' World)</div>';
-    html += online.map(r => `
-      <div class="search-result" onclick="addOnlinePlant('${r.slug}')">
-        <div>🌐</div>
-        <div><div class="name">${r.name}</div></div>
-        <span class="badge online-badge">Online</span>
-      </div>
-    `).join('');
-  }
 
-  if (local.length > 0) {
+  // Local - grouped by genus
+  const genusKeys = Object.keys(genusList).sort().slice(0, 15);
+  if (genusKeys.length > 0) {
     html += '<div class="section-header">Local Database</div>';
-    html += local.map(p => `
-      <div class="search-result" onclick="addPlantToGarden('${p.id}')">
-        <div>🌿</div>
-        <div><div class="name">${p.name} ${p.variety || ''}</div><div class="variety">${p.category}</div></div>
-        <span class="badge">${p.category}</span>
+    for (const genus of genusKeys) {
+      const varieties = genusList[genus];
+      if (varieties.length === 1 && !varieties[0].variety) {
+        html += `<div class="search-result" onclick="addPlantToGarden('${varieties[0].id}')">
+          <div>🌿</div>
+          <div><div class="name">${genus}</div><div class="variety">${varieties[0].category}</div></div>
+          <span class="badge">${varieties[0].category}</span>
+        </div>`;
+      } else {
+        html += `<div class="search-result" onclick="toggleGenusExpand('local-${genus.replace(/\s/g,'-')}')" style="cursor:pointer">
+          <div>🌿</div>
+          <div><div class="name">${genus}</div><div class="variety">${varieties.length} varieties • ${varieties[0].category}</div></div>
+          <span style="color:var(--gray);font-size:12px">▾</span>
+        </div>`;
+        html += `<div id="local-${genus.replace(/\s/g,'-')}" style="display:none;padding-left:20px">`;
+        for (const p of varieties.slice(0, 10)) {
+          html += `<div class="search-result" onclick="addPlantToGarden('${p.id}')">
+            <div style="font-size:12px">↳</div>
+            <div><div class="name">${p.variety || genus}</div></div>
+            <span class="badge">${p.category}</span>
+          </div>`;
+        }
+        html += '</div>';
+      }
+    }
+  }
+
+  // Online - grouped by genus
+  const onlineGenusKeys = Object.keys(onlineGenus).sort().slice(0, 10);
+  if (onlineGenusKeys.length > 0) {
+    html += '<div class="section-header">Online (Gardeners\' World)</div>';
+    for (const genus of onlineGenusKeys) {
+      const varieties = onlineGenus[genus];
+      if (varieties.length === 1) {
+        html += `<div class="search-result" onclick="addOnlinePlant('${varieties[0].slug}')">
+          <div>🌐</div>
+          <div><div class="name">${varieties[0].name}</div></div>
+          <span class="badge online-badge">Online</span>
+        </div>`;
+      } else {
+        html += `<div class="search-result" onclick="toggleGenusExpand('online-${genus.replace(/\s/g,'-')}')" style="cursor:pointer">
+          <div>🌐</div>
+          <div><div class="name">${genus}</div><div class="variety">${varieties.length} varieties</div></div>
+          <span style="color:var(--gray);font-size:12px">▾</span>
+        </div>`;
+        html += `<div id="online-${genus.replace(/\s/g,'-')}" style="display:none;padding-left:20px">`;
+        for (const o of varieties) {
+          html += `<div class="search-result" onclick="addOnlinePlant('${o.slug}')">
+            <div style="font-size:12px">↳</div>
+            <div><div class="name">${o.name}</div></div>
+            <span class="badge online-badge">Online</span>
+          </div>`;
+        }
+        html += '</div>';
+      }
+    }
+  }
+
+  // Community
+  if (communityPlants.length > 0) {
+    html += '<div class="section-header">Community Added</div>';
+    html += communityPlants.map(p => `
+      <div class="search-result" onclick="addCommunityPlant('${encodeURIComponent(JSON.stringify(p))}')">
+        <div>👥</div>
+        <div><div class="name">${p.name} ${p.variety || ''}</div><div class="variety">${p.tasks?.length || 0} tasks</div></div>
+        <span class="badge" style="background:#fef3c7;color:#92400e">Community</span>
       </div>
     `).join('');
   }
 
-  if (!html) html = '<div class="empty-state"><p>No results</p></div>';
+  if (!html) html = '<div class="empty-state"><p>No results found. Try "+ Add plant manually" above.</p></div>';
   container.innerHTML = html;
+};
+
+window.toggleGenusExpand = function(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+};
+
+window.addCommunityPlant = async function(encoded) {
+  const plant = JSON.parse(decodeURIComponent(encoded));
+  const plantId = crypto.randomUUID();
+  const year = currentYear;
+
+  await put('gardenPlants', { id: crypto.randomUUID(), plantId, name: plant.name, variety: plant.variety || '', addedDate: new Date().toISOString() });
+
+  for (const t of (plant.tasks || [])) {
+    const task = {
+      id: crypto.randomUUID(),
+      plantId,
+      plantName: plant.name,
+      variety: plant.variety || '',
+      taskType: t.taskType,
+      startMonth: t.startMonth,
+      endMonth: t.endMonth,
+      year,
+      isCompleted: false,
+      notes: t.notes || '',
+    };
+    await put('tasks', task);
+  }
+
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchResults').innerHTML = `<div class="empty-state"><p>✓ Added ${plant.name} ${plant.variety || ''} from community</p></div>`;
 };
 
 window.addPlantToGarden = async function(plantId) {
@@ -777,9 +884,19 @@ window.saveManualPlant = async function() {
     await generateSubTasksForTask(task, name);
   }
 
+  // Submit to community database (if worker is available)
+  try {
+    await fetch(PUSH_SERVER + '/plants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, variety, category, tasks: manualTasks }),
+    });
+  } catch(e) {}
+
+  const taskCount = manualTasks.length;
   closeModal();
   manualTasks = [];
-  document.getElementById('searchResults').innerHTML = `<div class="empty-state"><p>✓ Added ${name} ${variety} with ${manualTasks.length || 'all'} tasks</p></div>`;
+  document.getElementById('searchResults').innerHTML = `<div class="empty-state"><p>✓ Added ${name} ${variety || ''} with ${taskCount} tasks</p></div>`;
 };
 
 window.closeModal = function(e) {
