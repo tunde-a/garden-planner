@@ -1,12 +1,12 @@
 const CACHE_NAME = 'garden-planner-v1';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/app.js',
-  '/db.js',
-  '/plants.js',
-  '/style.css',
-  '/manifest.json'
+  './',
+  './index.html',
+  './app.js',
+  './db.js',
+  './plants.js',
+  './style.css',
+  './manifest.json'
 ];
 
 self.addEventListener('install', event => {
@@ -33,7 +33,7 @@ self.addEventListener('fetch', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  event.waitUntil(clients.openWindow('/'));
+  event.waitUntil(clients.openWindow('./'));
 });
 
 self.addEventListener('message', event => {
@@ -42,8 +42,8 @@ self.addEventListener('message', event => {
     setTimeout(() => {
       self.registration.showNotification(title, {
         body,
-        icon: '/icon-192.png',
-        badge: '/icon-192.png'
+        icon: './icon-192.png',
+        badge: './icon-192.png'
       });
     }, delay);
   }
