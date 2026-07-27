@@ -17,16 +17,53 @@ async function init() {
   renderCalendar();
 }
 
+const VAPID_PUBLIC_KEY = 'BOvIr2PLl-9ZYtR_Z5jgKqq7iEWWc4v9eD3YEMcReAXpDriYP-h8FeuqkFXmC7blJkOzjSJzhtRJkZsEeZSztsM';
+const PUSH_SERVER = 'https://garden-push.tunde-a.workers.dev';
+
 function registerSW() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js');
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      subscribeToPush(reg);
+    });
   }
 }
 
-function requestNotifications() {
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
+async function subscribeToPush(registration) {
+  if (!('PushManager' in window)) return;
+
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') return;
+
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    const key = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: key
+    });
   }
+
+  // Send subscription to push server
+  try {
+    await fetch(PUSH_SERVER + '/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(subscription)
+    });
+  } catch (e) {
+    console.log('Push subscription stored locally, server not yet available');
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+function requestNotifications() {
+  // handled by subscribeToPush
 }
 
 // Navigation

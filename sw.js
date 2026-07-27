@@ -1,4 +1,4 @@
-const CACHE_NAME = 'garden-planner-v1';
+const CACHE_NAME = 'garden-planner-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -31,20 +31,22 @@ self.addEventListener('fetch', event => {
   );
 });
 
+self.addEventListener('push', event => {
+  let data = { title: 'Garden Planner', body: 'Check your garden tasks for this week!' };
+  if (event.data) {
+    try { data = event.data.json(); } catch (e) { data.body = event.data.text(); }
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      data: { url: './' }
+    })
+  );
+});
+
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   event.waitUntil(clients.openWindow('./'));
-});
-
-self.addEventListener('message', event => {
-  if (event.data.type === 'SCHEDULE_NOTIFICATION') {
-    const { title, body, delay } = event.data;
-    setTimeout(() => {
-      self.registration.showNotification(title, {
-        body,
-        icon: './icon-192.png',
-        badge: './icon-192.png'
-      });
-    }, delay);
-  }
 });
