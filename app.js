@@ -221,14 +221,17 @@ function renderTaskCard(task, subTasks) {
         <input type="text" placeholder="Add subtask..." id="sub-input-${task.id}" onkeydown="if(event.key==='Enter')addSubTask('${task.id}')">
         <button onclick="addSubTask('${task.id}')">Add</button>
       </div>
-      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--gray-light)">
-        <label style="font-size:11px;color:var(--gray);font-weight:600">Repeat cadence:</label>
-        <select style="font-size:12px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;margin-left:6px" onchange="setCadence('${task.id}',this.value)">
-          <option value="" ${!task.cadence ? 'selected' : ''}>None (one-off)</option>
-          <option value="Weekly" ${task.cadence === 'Weekly' ? 'selected' : ''}>Weekly</option>
-          <option value="Every 2 Weeks" ${task.cadence === 'Every 2 Weeks' ? 'selected' : ''}>Every 2 Weeks</option>
-          <option value="Monthly" ${task.cadence === 'Monthly' ? 'selected' : ''}>Monthly</option>
-        </select>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--gray-light);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <label style="font-size:11px;color:var(--gray);font-weight:600">Repeat:</label>
+          <select style="font-size:12px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;margin-left:4px" onchange="setCadence('${task.id}',this.value)">
+            <option value="" ${!task.cadence ? 'selected' : ''}>None</option>
+            <option value="Weekly" ${task.cadence === 'Weekly' ? 'selected' : ''}>Weekly</option>
+            <option value="Every 2 Weeks" ${task.cadence === 'Every 2 Weeks' ? 'selected' : ''}>Every 2 Weeks</option>
+            <option value="Monthly" ${task.cadence === 'Monthly' ? 'selected' : ''}>Monthly</option>
+          </select>
+        </div>
+        <button onclick="deleteTask('${task.id}')" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;padding:4px 8px">Delete task</button>
       </div>
     </div>
   </div>`;
@@ -325,8 +328,22 @@ window.addSubTask = async function(taskId) {
 
 window.deleteSubTask = async function(subId) {
   await remove('subTasks', subId);
-  if (currentPage === 'detail') renderGarden(); // will re-enter detail
-  else renderCalendar();
+  if (currentPage === 'detail' && window._detailPlant) {
+    renderDetail(window._detailPlant.name, window._detailPlant.variety || '');
+  } else renderCalendar();
+};
+
+window.deleteTask = async function(taskId) {
+  if (!confirm('Delete this task?')) return;
+  // Delete subtasks first
+  const subs = await getAll('subTasks');
+  for (const s of subs.filter(s => s.taskId === taskId)) {
+    await remove('subTasks', s.id);
+  }
+  await remove('tasks', taskId);
+  if (currentPage === 'detail' && window._detailPlant) {
+    renderDetail(window._detailPlant.name, window._detailPlant.variety || '');
+  } else renderCalendar();
 };
 
 window.completeRecurring = async function(id) {
@@ -500,7 +517,9 @@ async function renderGarden() {
 
 window.showPlantDetail = function(name, variety) {
   showPage('detail');
+  document.getElementById('headerTitle').textContent = `${name} ${variety}`;
   document.getElementById('detailTitle').textContent = `${name} ${variety}`;
+  window._detailPlant = { name, variety };
   renderDetail(name, variety);
 };
 
@@ -509,10 +528,11 @@ async function renderDetail(name, variety) {
   const subTasks = await getAll('subTasks');
   const plantTasks = tasks.filter(t => t.plantName === name && t.variety === (variety || '')).sort((a, b) => a.startMonth - b.startMonth);
 
-  const incomplete = plantTasks.filter(t => !t.isCompleted);
-  const completed = plantTasks.filter(t => t.isCompleted);
+  const incomplete = plantTasks.filter(t => !t.isCompleted || (t.cadence && isTaskCadenceDue(t)));
+  const completed = plantTasks.filter(t => t.isCompleted && !(t.cadence && isTaskCadenceDue(t)));
 
-  let html = '';
+  let html = `<button class="btn btn-outline" style="width:100%;margin-bottom:12px;font-size:13px" onclick="showAddTaskToPlant()">+ Add task to this plant</button>`;
+
   if (incomplete.length > 0) {
     html += '<div class="section-header">To Do</div>';
     html += incomplete.map(t => renderTaskCard(t, subTasks)).join('');
@@ -522,11 +542,62 @@ async function renderDetail(name, variety) {
     html += completed.map(t => renderTaskCard(t, subTasks)).join('');
   }
   if (plantTasks.length === 0) {
-    html = '<div class="empty-state"><p>No tasks for this plant</p></div>';
+    html += '<div class="empty-state"><p>No tasks for this plant. Tap the button above to add one.</p></div>';
   }
 
   document.getElementById('detailTasks').innerHTML = html;
 }
+
+window.showAddTaskToPlant = function() {
+  const { name, variety } = window._detailPlant || {};
+  if (!name) return;
+  const taskTypes = ['Sow Indoors','Sow Outdoors','Plant Out','Harvest','Flowering','Prune','Cut Back','Divide','Overwinter'];
+  const currentMo = new Date().getMonth() + 1;
+  document.getElementById('modalContainer').innerHTML = `
+    <div class="modal-overlay" onclick="closeModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <h3>Add Task to ${name} ${variety || ''}</h3>
+        <div class="form-group"><label>Task Type</label><select id="detailTaskType" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px">
+          ${taskTypes.map(t => `<option value="${t}">${t}</option>`).join('')}
+        </select></div>
+        <div class="form-group"><label>From Month</label><select id="detailStart" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px">${MONTH_FULL.map((m, i) => `<option value="${i+1}" ${i+1===currentMo?'selected':''}>${m}</option>`).join('')}</select></div>
+        <div class="form-group"><label>To Month</label><select id="detailEnd" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px">${MONTH_FULL.map((m, i) => `<option value="${i+1}" ${i+1===currentMo?'selected':''}>${m}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Notes (optional)</label><input id="detailNotes" placeholder="Any notes..." style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px"></div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-green" onclick="saveTaskToPlant()">Add</button>
+        </div>
+      </div>
+    </div>`;
+};
+
+window.saveTaskToPlant = async function() {
+  const { name, variety } = window._detailPlant || {};
+  if (!name) return;
+
+  const taskType = document.getElementById('detailTaskType').value;
+  const startMonth = parseInt(document.getElementById('detailStart').value);
+  const endMonth = parseInt(document.getElementById('detailEnd').value);
+  const notes = document.getElementById('detailNotes').value.trim();
+
+  const task = {
+    id: crypto.randomUUID(),
+    plantId: '',
+    plantName: name,
+    variety: variety || '',
+    taskType,
+    startMonth,
+    endMonth,
+    year: currentYear,
+    isCompleted: false,
+    notes,
+  };
+  await put('tasks', task);
+  await generateSubTasksForTask(task, name);
+
+  closeModal();
+  renderDetail(name, variety || '');
+};
 
 // Reminders
 async function renderReminders() {
@@ -596,7 +667,10 @@ window.deleteRecurring = async function(id) {
   renderReminders();
 };
 
+let manualTasks = [];
+
 window.showAddManualModal = function() {
+  manualTasks = [];
   const taskTypes = ['Sow Indoors','Sow Outdoors','Plant Out','Harvest','Flowering','Prune','Cut Back','Divide','Overwinter'];
   document.getElementById('modalContainer').innerHTML = `
     <div class="modal-overlay" onclick="closeModal(event)">
@@ -605,10 +679,19 @@ window.showAddManualModal = function() {
         <div class="form-group"><label>Plant Name</label><input id="manName" placeholder="e.g. Dahlia"></div>
         <div class="form-group"><label>Variety (optional)</label><input id="manVariety" placeholder="e.g. Bishop of Llandaff"></div>
         <div class="form-group"><label>Category</label><select id="manCategory"><option>Vegetable</option><option>Herb</option><option>Fruit</option><option selected>Flower</option></select></div>
-        <div class="form-group"><label>Task Type</label><select id="manTaskType">${taskTypes.map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>
-        <div class="form-group"><label>From Month</label><select id="manStart">${MONTH_FULL.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('')}</select></div>
-        <div class="form-group"><label>To Month</label><select id="manEnd">${MONTH_FULL.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('')}</select></div>
-        <div class="form-group"><label>Notes (optional)</label><input id="manNotes" placeholder="Any notes..."></div>
+
+        <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-light)">
+          <label style="font-size:13px;font-weight:700;display:block;margin-bottom:8px">Tasks</label>
+          <div id="manualTasksList"></div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+            <select id="addTaskType" style="flex:1;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px">
+              ${taskTypes.map(t => `<option value="${t}">${t}</option>`).join('')}
+            </select>
+            <button class="btn btn-outline" style="padding:8px 12px;font-size:13px" onclick="addManualTaskRow()">+ Add</button>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top:14px"><label>Notes (optional)</label><input id="manNotes" placeholder="Any notes..."></div>
         <div class="modal-actions">
           <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
           <button class="btn btn-green" onclick="saveManualPlant()">Add to Garden</button>
@@ -617,44 +700,86 @@ window.showAddManualModal = function() {
     </div>`;
 };
 
+window.addManualTaskRow = function() {
+  const taskType = document.getElementById('addTaskType').value;
+  const currentMo = new Date().getMonth() + 1;
+  manualTasks.push({ taskType, startMonth: currentMo, endMonth: currentMo });
+  renderManualTasksList();
+};
+
+function renderManualTasksList() {
+  const container = document.getElementById('manualTasksList');
+  if (manualTasks.length === 0) {
+    container.innerHTML = '<p style="font-size:12px;color:var(--gray);margin:4px 0">No tasks added yet. Select a type and tap + Add.</p>';
+    return;
+  }
+  container.innerHTML = manualTasks.map((t, i) => `
+    <div style="background:var(--gray-light);border-radius:8px;padding:10px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:600">${taskIcon(t.taskType)} ${t.taskType}</span>
+        <button onclick="removeManualTask(${i})" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer">×</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select onchange="updateManualTask(${i},'startMonth',this.value)" style="flex:1;padding:6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px">
+          ${MONTH_FULL.map((m, mi) => `<option value="${mi+1}" ${mi+1===t.startMonth?'selected':''}>${m}</option>`).join('')}
+        </select>
+        <span style="font-size:12px;color:var(--gray)">to</span>
+        <select onchange="updateManualTask(${i},'endMonth',this.value)" style="flex:1;padding:6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px">
+          ${MONTH_FULL.map((m, mi) => `<option value="${mi+1}" ${mi+1===t.endMonth?'selected':''}>${m}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+  `).join('');
+}
+
+window.updateManualTask = function(index, field, value) {
+  manualTasks[index][field] = parseInt(value);
+};
+
+window.removeManualTask = function(index) {
+  manualTasks.splice(index, 1);
+  renderManualTasksList();
+};
+
 window.saveManualPlant = async function() {
   const name = document.getElementById('manName').value.trim();
   if (!name) return;
+  if (manualTasks.length === 0) { alert('Add at least one task'); return; }
+
   const variety = document.getElementById('manVariety').value.trim();
   const category = document.getElementById('manCategory').value;
-  const taskType = document.getElementById('manTaskType').value;
-  const startMonth = parseInt(document.getElementById('manStart').value);
-  const endMonth = parseInt(document.getElementById('manEnd').value);
   const notes = document.getElementById('manNotes').value.trim();
-
   const year = currentYear;
   const plantId = crypto.randomUUID();
 
-  // Check if this plant already exists in garden
+  // Add to garden
   const gardenPlants = await getAll('gardenPlants');
   const existing = gardenPlants.find(g => g.name === name && g.variety === variety);
-
   if (!existing) {
     await put('gardenPlants', { id: crypto.randomUUID(), plantId, name, variety, addedDate: new Date().toISOString() });
   }
 
-  // Add the task
-  const task = {
-    id: crypto.randomUUID(),
-    plantId,
-    plantName: name,
-    variety,
-    taskType,
-    startMonth,
-    endMonth,
-    year,
-    isCompleted: false,
-    notes,
-  };
-  await put('tasks', task);
+  // Add all tasks
+  for (const t of manualTasks) {
+    const task = {
+      id: crypto.randomUUID(),
+      plantId,
+      plantName: name,
+      variety,
+      taskType: t.taskType,
+      startMonth: t.startMonth,
+      endMonth: t.endMonth,
+      year,
+      isCompleted: false,
+      notes,
+    };
+    await put('tasks', task);
+    await generateSubTasksForTask(task, name);
+  }
 
   closeModal();
-  document.getElementById('searchResults').innerHTML = `<div class="empty-state"><p>✓ Added ${name} ${variety} — ${taskType} (${MONTHS[startMonth-1]}–${MONTHS[endMonth-1]})</p></div>`;
+  manualTasks = [];
+  document.getElementById('searchResults').innerHTML = `<div class="empty-state"><p>✓ Added ${name} ${variety} with ${manualTasks.length || 'all'} tasks</p></div>`;
 };
 
 window.closeModal = function(e) {
