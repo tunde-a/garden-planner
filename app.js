@@ -231,7 +231,8 @@ function renderTaskCard(task, subTasks) {
             <option value="Monthly" ${task.cadence === 'Monthly' ? 'selected' : ''}>Monthly</option>
           </select>
         </div>
-        <button onclick="deleteTask('${task.id}')" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;padding:4px 8px">Delete task</button>
+        <button onclick="showEditTask('${task.id}')" style="background:none;border:none;color:var(--blue);font-size:12px;cursor:pointer;padding:4px 8px">Edit</button>
+        <button onclick="deleteTask('${task.id}')" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;padding:4px 8px">Delete</button>
       </div>
     </div>
   </div>`;
@@ -331,6 +332,54 @@ window.deleteSubTask = async function(subId) {
   if (currentPage === 'detail' && window._detailPlant) {
     renderDetail(window._detailPlant.name, window._detailPlant.variety || '');
   } else renderCalendar();
+};
+
+window.showEditTask = async function(taskId) {
+  const tasks = await getAll('tasks');
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  const taskTypes = ['Sow Indoors','Sow Outdoors','Plant Out','Harvest','Flowering','Prune','Cut Back','Divide','Overwinter'];
+  document.getElementById('modalContainer').innerHTML = `
+    <div class="modal-overlay" onclick="closeModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <h3>Edit Task</h3>
+        <div class="form-group"><label>Task Type</label><select id="editTaskType" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px">
+          ${taskTypes.map(t => `<option value="${t}" ${t===task.taskType?'selected':''}>${t}</option>`).join('')}
+        </select></div>
+        <div class="form-group"><label>From Month</label><select id="editStart" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px">
+          ${MONTH_FULL.map((m, i) => `<option value="${i+1}" ${i+1===task.startMonth?'selected':''}>${m}</option>`).join('')}
+        </select></div>
+        <div class="form-group"><label>To Month</label><select id="editEnd" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px">
+          ${MONTH_FULL.map((m, i) => `<option value="${i+1}" ${i+1===task.endMonth?'selected':''}>${m}</option>`).join('')}
+        </select></div>
+        <div class="form-group"><label>Notes</label><input id="editNotes" value="${task.notes || ''}" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px"></div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-green" onclick="saveEditTask('${task.id}')">Save</button>
+        </div>
+      </div>
+    </div>`;
+};
+
+window.saveEditTask = async function(taskId) {
+  const tasks = await getAll('tasks');
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  task.taskType = document.getElementById('editTaskType').value;
+  task.startMonth = parseInt(document.getElementById('editStart').value);
+  task.endMonth = parseInt(document.getElementById('editEnd').value);
+  task.notes = document.getElementById('editNotes').value.trim();
+
+  await put('tasks', task);
+  closeModal();
+
+  if (currentPage === 'detail' && window._detailPlant) {
+    renderDetail(window._detailPlant.name, window._detailPlant.variety || '');
+  } else {
+    renderCalendar();
+  }
 };
 
 window.deleteTask = async function(taskId) {
