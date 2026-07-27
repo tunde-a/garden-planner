@@ -1,5 +1,6 @@
 import { getAll, put, remove, getByIndex, seedPlants } from './db.js';
 import { PLANTS, SUBTASK_DEFAULTS, PLANT_SLUGS } from './plants.js';
+import { FOTHERGILLS_SLUGS } from './fothergills_slugs.js';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTH_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -432,6 +433,16 @@ window.onSearch = async function(query) {
     onlineGenus[genus].push(o);
   }
 
+  // Mr Fothergills
+  const fothergills = FOTHERGILLS_SLUGS.filter(s => s.name.toLowerCase().includes(lower)).slice(0, 15);
+  const fothGenус = {};
+  for (const f of fothergills) {
+    const parts = f.name.split(' ');
+    const genus = parts[0];
+    if (!fothGenус[genus]) fothGenус[genus] = [];
+    fothGenус[genus].push(f);
+  }
+
   // Community plants
   let communityPlants = [];
   try {
@@ -503,6 +514,37 @@ window.onSearch = async function(query) {
     }
   }
 
+  // Mr Fothergills
+  const fothKeys = Object.keys(fothGenус).sort().slice(0, 8);
+  if (fothKeys.length > 0) {
+    html += '<div class="section-header">Mr Fothergills (Seeds)</div>';
+    for (const genus of fothKeys) {
+      const varieties = fothGenус[genus];
+      if (varieties.length === 1) {
+        html += `<div class="search-result" onclick="addFothergillsPlant('${varieties[0].slug}')">
+          <div>🌰</div>
+          <div><div class="name">${varieties[0].name}</div></div>
+          <span class="badge" style="background:#fef9c3;color:#854d0e">Seeds</span>
+        </div>`;
+      } else {
+        html += `<div class="search-result" onclick="toggleGenusExpand('foth-${genus.replace(/\s/g,'-')}')" style="cursor:pointer">
+          <div>🌰</div>
+          <div><div class="name">${genus}</div><div class="variety">${varieties.length} varieties</div></div>
+          <span style="color:var(--gray);font-size:12px">▾</span>
+        </div>`;
+        html += `<div id="foth-${genus.replace(/\s/g,'-')}" style="display:none;padding-left:20px">`;
+        for (const f of varieties) {
+          html += `<div class="search-result" onclick="addFothergillsPlant('${f.slug}')">
+            <div style="font-size:12px">↳</div>
+            <div><div class="name">${f.name}</div></div>
+            <span class="badge" style="background:#fef9c3;color:#854d0e">Seeds</span>
+          </div>`;
+        }
+        html += '</div>';
+      }
+    }
+  }
+
   // Community
   if (communityPlants.length > 0) {
     html += '<div class="section-header">Community Added</div>';
@@ -523,6 +565,89 @@ window.toggleGenusExpand = function(id) {
   const el = document.getElementById(id);
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 };
+
+window.addFothergillsPlant = async function(slug) {
+  document.getElementById('searchResults').innerHTML = '<div class="empty-state"><p>Fetching data from Mr Fothergills...</p></div>';
+
+  try {
+    const resp = await fetch(`https://mr-fothergills.co.uk/products/${slug}`);
+    const html = await resp.text();
+    const data = parseFothergillsPage(html, slug);
+
+    if (!data.tasks.length) {
+      document.getElementById('searchResults').innerHTML = '<div class="empty-state"><p>No planting data found for this product.</p></div>';
+      return;
+    }
+
+    const plantId = crypto.randomUUID();
+    const year = currentYear;
+
+    await put('gardenPlants', { id: crypto.randomUUID(), plantId, name: data.name, variety: data.variety, addedDate: new Date().toISOString() });
+
+    for (const t of data.tasks) {
+      const task = {
+        id: crypto.randomUUID(),
+        plantId,
+        plantName: data.name,
+        variety: data.variety,
+        taskType: t.taskType,
+        startMonth: t.startMonth,
+        endMonth: t.endMonth,
+        year,
+        isCompleted: false,
+        notes: t.notes || '',
+      };
+      await put('tasks', task);
+      await generateSubTasksForTask(task, data.name);
+    }
+
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchResults').innerHTML = `<div class="empty-state"><p>✓ Added ${data.name} ${data.variety} with ${data.tasks.length} tasks</p></div>`;
+  } catch(e) {
+    document.getElementById('searchResults').innerHTML = `<div class="empty-state"><p>Error fetching data. Try adding manually.</p></div>`;
+  }
+};
+
+function parseFothergillsPage(html, slug) {
+  const MONTH_MAP = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+
+  // Parse name from slug
+  let name = slug.replace(/-seeds$|-flower-seeds$|-vegetable-seeds$|-herb-seeds$|-bulbs$/i, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const parts = name.split(' ');
+  const genus = parts[0];
+  const variety = parts.slice(1).join(' ');
+
+  const tasks = [];
+
+  // Find task/month pairs: "Sow Indoors" ... "Feb - Apr"
+  const taskPattern = /(Sow Indoors|Sow Outdoors|Sow Outside|Sow Under Glass|Plant Out|Planting|Flowering|Flowering Period|Harvest)\s*(?:<[^>]*>\s*)*([\w]{3,9})\s*-\s*([\w]{3,9})/gi;
+  let match;
+  const seen = new Set();
+
+  while ((match = taskPattern.exec(html)) !== null) {
+    let taskType = match[1].trim();
+    const startStr = match[2].toLowerCase().substring(0, 3);
+    const endStr = match[3].toLowerCase().substring(0, 3);
+
+    const startMonth = MONTH_MAP[startStr];
+    const endMonth = MONTH_MAP[endStr];
+    if (!startMonth || !endMonth) continue;
+
+    // Normalize task types
+    if (taskType === 'Sow Outside') taskType = 'Sow Outdoors';
+    if (taskType === 'Sow Under Glass') taskType = 'Sow Indoors';
+    if (taskType === 'Planting') taskType = 'Plant Out';
+    if (taskType === 'Flowering Period') taskType = 'Flowering';
+
+    const key = `${taskType}_${startMonth}_${endMonth}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    tasks.push({ taskType, startMonth, endMonth });
+  }
+
+  return { name: genus, variety, tasks };
+}
 
 window.addCommunityPlant = async function(encoded) {
   const plant = JSON.parse(decodeURIComponent(encoded));

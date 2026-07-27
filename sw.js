@@ -1,10 +1,11 @@
-const CACHE_NAME = 'garden-planner-v2';
+const CACHE_NAME = 'garden-planner-v3';
 const ASSETS = [
   './',
   './index.html',
   './app.js',
   './db.js',
   './plants.js',
+  './fothergills_slugs.js',
   './style.css',
   './manifest.json'
 ];
