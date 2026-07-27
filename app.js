@@ -638,7 +638,10 @@ async function renderDetail(name, variety) {
   const incomplete = plantTasks.filter(t => !t.isCompleted || (t.cadence && isTaskCadenceDue(t)));
   const completed = plantTasks.filter(t => t.isCompleted && !(t.cadence && isTaskCadenceDue(t)));
 
-  let html = `<button class="btn btn-outline" style="width:100%;margin-bottom:12px;font-size:13px" onclick="showAddTaskToPlant()">+ Add task to this plant</button>`;
+  let html = `<div style="display:flex;gap:8px;margin-bottom:12px">
+    <button class="btn btn-outline" style="flex:1;font-size:13px" onclick="showAddTaskToPlant()">+ Add task</button>
+    <button class="btn btn-outline" style="font-size:13px;color:var(--red);border-color:var(--red)" onclick="removePlantFromGarden()">Remove plant</button>
+  </div>`;
 
   if (incomplete.length > 0) {
     html += '<div class="section-header">To Do</div>';
@@ -654,6 +657,29 @@ async function renderDetail(name, variety) {
 
   document.getElementById('detailTasks').innerHTML = html;
 }
+
+window.removePlantFromGarden = async function() {
+  const { name, variety } = window._detailPlant || {};
+  if (!name) return;
+  if (!confirm(`Remove ${name} ${variety || ''} from your garden? This will delete all its tasks.`)) return;
+
+  // Delete all tasks for this plant
+  const tasks = await getAll('tasks');
+  const subTasks = await getAll('subTasks');
+  for (const t of tasks.filter(t => t.plantName === name && t.variety === (variety || ''))) {
+    for (const s of subTasks.filter(s => s.taskId === t.id)) {
+      await remove('subTasks', s.id);
+    }
+    await remove('tasks', t.id);
+  }
+
+  // Delete the garden plant entry
+  const gardenPlants = await getAll('gardenPlants');
+  const gp = gardenPlants.find(g => g.name === name && g.variety === (variety || ''));
+  if (gp) await remove('gardenPlants', gp.id);
+
+  showPage('garden');
+};
 
 window.showAddTaskToPlant = function() {
   const { name, variety } = window._detailPlant || {};
